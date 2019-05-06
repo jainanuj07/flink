@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -64,12 +65,13 @@ import static org.apache.flink.mesos.configuration.MesosOptions.PORT_ASSIGNMENTS
 public class LaunchableMesosWorker implements LaunchableTask {
 
 	protected static final Logger LOG = LoggerFactory.getLogger(LaunchableMesosWorker.class);
+
 	/**
 	 * The set of configuration keys to be dynamically configured with a port allocated from Mesos.
 	 */
-	static final String[] TM_PORT_KEYS = {
+	static final Set<String> TM_PORT_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
 		"taskmanager.rpc.port",
-		"taskmanager.data.port"};
+		"taskmanager.data.port")));
 
 	private final MesosArtifactResolver resolver;
 	private final ContainerSpecification containerSpec;
@@ -143,7 +145,7 @@ public class LaunchableMesosWorker implements LaunchableTask {
 
 		@Override
 		public double getDisk() {
-			return 0.0;
+			return params.disk();
 		}
 
 		@Override
@@ -218,6 +220,10 @@ public class LaunchableMesosWorker implements LaunchableTask {
 		taskInfo.addAllResources(allocation.takeScalar("cpus", taskRequest.getCPUs(), roles));
 		taskInfo.addAllResources(allocation.takeScalar("gpus", taskRequest.getGPUs(), roles));
 		taskInfo.addAllResources(allocation.takeScalar("mem", taskRequest.getMemory(), roles));
+
+		if (taskRequest.getDisk() > 0.0) {
+			taskInfo.addAllResources(allocation.takeScalar("disk", taskRequest.getDisk(), roles));
+		}
 
 		final Protos.CommandInfo.Builder cmd = taskInfo.getCommandBuilder();
 		final Protos.Environment.Builder env = cmd.getEnvironmentBuilder();
@@ -342,16 +348,18 @@ public class LaunchableMesosWorker implements LaunchableTask {
 	 * @return A deterministically ordered Set of port keys to expose from the TM container
 	 */
 	static Set<String> extractPortKeys(Configuration config) {
-		final LinkedHashSet<String> tmPortKeys = new LinkedHashSet<>(Arrays.asList(TM_PORT_KEYS));
+		final LinkedHashSet<String> tmPortKeys = new LinkedHashSet<>(TM_PORT_KEYS);
 
 		final String portKeys = config.getString(PORT_ASSIGNMENTS);
 
-		Arrays.stream(portKeys.split(","))
-			.map(String::trim)
-			.peek(key -> LOG.debug("Adding port key " + key + " to mesos request"))
-			.forEach(tmPortKeys::add);
+		if (portKeys != null) {
+			Arrays.stream(portKeys.split(","))
+				.map(String::trim)
+				.peek(key -> LOG.debug("Adding port key {} to mesos request"))
+				.forEach(tmPortKeys::add);
+		}
 
-		return tmPortKeys;
+		return Collections.unmodifiableSet(tmPortKeys);
 	}
 
 	@Override

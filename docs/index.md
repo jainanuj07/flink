@@ -47,6 +47,8 @@ Before putting your Flink job into production, read the [Production Readiness Ch
 
 Release notes cover important changes between Flink versions. Please carefully read these notes if you plan to upgrade your Flink setup to a later version. 
 
+* [Release notes for Flink 1.8](release-notes/flink-1.8.html).
+* [Release notes for Flink 1.7](release-notes/flink-1.7.html).
 * [Release notes for Flink 1.6](release-notes/flink-1.6.html).
 * [Release notes for Flink 1.5](release-notes/flink-1.5.html).
 
@@ -54,6 +56,6 @@ Release notes cover important changes between Flink versions. Please carefully r
 
 - **Flink Forward**: Talks from past conferences are available at the [Flink Forward](http://flink-forward.org/) website and on [YouTube](https://www.youtube.com/channel/UCY8_lgiZLZErZPF47a2hXMA). [Robust Stream Processing with Apache Flink](http://2016.flink-forward.org/kb_sessions/robust-stream-processing-with-apache-flink/) is a good place to start.
 
-- **Training**: The [training materials](http://training.data-artisans.com/) from data Artisans include slides, exercises, and sample solutions.
+- **Training**: The [training materials](https://training.ververica.com/) from data Artisans include slides, exercises, and sample solutions.
 
-- **Blogs**: The [Apache Flink](https://flink.apache.org/blog/) and [data Artisans](https://data-artisans.com/blog/) blogs publish frequent, in-depth technical articles about Flink.
+- **Blogs**: The [Apache Flink](https://flink.apache.org/blog/) and [Ververica](https://www.ververica.com/blog) blogs publish frequent, in-depth technical articles about Flink.

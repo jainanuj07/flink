@@ -22,11 +22,13 @@ OUT_TYPE="${1:-local}" # other type: s3
 source "$(dirname "$0")"/common.sh
 source "$(dirname "$0")"/common_s3.sh
 
+s3_setup hadoop
 set_conf_ssl "mutual"
+set_conf "metrics.fetcher.update-interval" "2000"
 
-OUT=out
+OUT=temp/test_streaming_file_sink-$(uuidgen)
 OUTPUT_PATH="$TEST_DATA_DIR/$OUT"
-S3_OUTPUT_PATH="s3://$ARTIFACTS_AWS_BUCKET/$OUT"
+S3_OUTPUT_PATH="s3://$IT_CASE_S3_BUCKET/$OUT"
 
 mkdir -p $OUTPUT_PATH
 
@@ -164,7 +166,7 @@ echo "Starting 2 TMs"
 wait_for_restart_to_complete 1 ${JOB_ID}
 
 echo "Waiting until all values have been produced"
-wait_for_complete_result 60000 300
+wait_for_complete_result 60000 900
 
 cancel_job "${JOB_ID}"
 

@@ -31,7 +31,6 @@ import org.apache.flink.runtime.io.network.buffer.NetworkBuffer;
 import org.apache.flink.runtime.io.network.netty.PartitionRequestClient;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
-import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
 import org.apache.flink.util.ExceptionUtils;
 
 import javax.annotation.Nullable;
@@ -108,7 +107,7 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 		ResultPartitionID partitionId,
 		ConnectionID connectionId,
 		ConnectionManager connectionManager,
-		TaskIOMetricGroup metrics) {
+		InputChannelMetrics metrics) {
 
 		this(inputGate, channelIndex, partitionId, connectionId, connectionManager, 0, 0, metrics);
 	}
@@ -121,7 +120,7 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 		ConnectionManager connectionManager,
 		int initialBackOff,
 		int maxBackoff,
-		TaskIOMetricGroup metrics) {
+		InputChannelMetrics metrics) {
 
 		super(inputGate, channelIndex, partitionId, initialBackOff, maxBackoff, metrics.getNumBytesInRemoteCounter(), metrics.getNumBuffersInRemoteCounter());
 
@@ -342,18 +341,18 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 
 	/**
 	 * The Buffer pool notifies this channel of an available floating buffer. If the channel is released or
-	 * currently does not need extra buffers, the buffer should be recycled to the buffer pool. Otherwise,
+	 * currently does not need extra buffers, the buffer should be returned to the buffer pool. Otherwise,
 	 * the buffer will be added into the <tt>bufferQueue</tt> and the unannounced credit is increased
 	 * by one.
 	 *
 	 * @param buffer Buffer that becomes available in buffer pool.
-	 * @return True when this channel is waiting for more floating buffers, otherwise false.
+	 * @return NotificationResult indicates whether this channel accepts the buffer and is waiting for
+	 *  	more floating buffers.
 	 */
 	@Override
-	public boolean notifyBufferAvailable(Buffer buffer) {
-		boolean recycleBuffer = true;
+	public NotificationResult notifyBufferAvailable(Buffer buffer) {
+		NotificationResult notificationResult = NotificationResult.BUFFER_NOT_USED;
 		try {
-			boolean needMoreBuffers = false;
 			synchronized (bufferQueue) {
 				checkState(isWaitingForFloatingBuffers,
 					"This channel should be waiting for floating buffers.");
@@ -364,36 +363,29 @@ public class RemoteInputChannel extends InputChannel implements BufferRecycler, 
 				// -> then isReleased is set correctly
 				// 2) releaseAllResources() did not yet release buffers from bufferQueue
 				// -> we may or may not have set isReleased yet but will always wait for the
-				//    lock on bufferQueue to release buffers
+				// lock on bufferQueue to release buffers
 				if (isReleased.get() || bufferQueue.getAvailableBufferSize() >= numRequiredBuffers) {
 					isWaitingForFloatingBuffers = false;
-					recycleBuffer = false; // just in case
-					buffer.recycleBuffer();
-					return false;
+					return notificationResult;
 				}
 
-				recycleBuffer = false;
 				bufferQueue.addFloatingBuffer(buffer);
 
 				if (bufferQueue.getAvailableBufferSize() == numRequiredBuffers) {
 					isWaitingForFloatingBuffers = false;
+					notificationResult = NotificationResult.BUFFER_USED_NO_NEED_MORE;
 				} else {
-					needMoreBuffers = true;
+					notificationResult = NotificationResult.BUFFER_USED_NEED_MORE;
 				}
 			}
 
 			if (unannouncedCredit.getAndAdd(1) == 0) {
 				notifyCreditAvailable();
 			}
-
-			return needMoreBuffers;
 		} catch (Throwable t) {
-			if (recycleBuffer) {
-				buffer.recycleBuffer();
-			}
 			setError(t);
-			return false;
 		}
+		return notificationResult;
 	}
 
 	@Override
